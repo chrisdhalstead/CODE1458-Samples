@@ -13,6 +13,9 @@
 
 #----------------------------------------------------------[Declarations]----------------------------------------------------------
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$script:mydocs = [environment]::getfolderpath('mydocuments')
+$script:date = Get-Date -Format d 
+$script:date = $script:date -replace "/","_" 
 
 #Ignore Cert Checking July 13, 2021
 add-type @"
@@ -190,8 +193,57 @@ Function Writables {
     @{Name = 'Type'; Expression = {$_.owner_type}},@{Name = 'Size in MB'; Expression = {$_.Size_mb}},@{Name = '% Available'; Expression = {$_.percent_available}},`
     @{Name = 'Last Mounted'; Expression = {$_.mounted_at_human}},@{Name = 'Attached?'; Expression = {$_.attached}},@{Name = 'Enabled?'; Expression = {$_.Status}}
             
+                        
+} 
+
+Function Writables_Usage {
+   
+  if ([string]::IsNullOrEmpty($AVSession))
+        {
+          write-host "You are not logged into App Volumes"
+          break   
+                             
+        }
+                  
+                            
+    try {                    
+      $sresult = Invoke-RestMethod -Method Get -Uri "https://$appvolserver/cv_api/writables" -ContentType "application/json" -WebSession $AVSession
+        }
+                          
+        catch {
+              Write-Host "An error occurred when logging on $_"
+              break 
+              }
+                   
+    $sresult.datastores.writable_volumes | Format-Table -AutoSize -Property @{Name = 'Name'; Expression = {$_.name}},@{Name = 'Total Size in MB'; Expression = {$_.total_mb}},@{Name = 'Free Size in MB'; Expression = {$_.free_mb}},@{Name = '% Available'; Expression = {$_.percent_available}}
                          
 } 
+
+Function Writables_Usage_Report {
+   
+  if ([string]::IsNullOrEmpty($AVSession))
+        {
+          write-host "You are not logged into App Volumes"
+          break   
+                             
+        }
+                  
+                            
+    try {                    
+      $sresult = Invoke-RestMethod -Method Get -Uri "https://$appvolserver/cv_api/writables" -ContentType "application/json" -WebSession $AVSession
+        }
+                          
+        catch {
+              Write-Host "An error occurred when logging on $_"
+              break 
+              }
+    
+    #Add Local CSV for Session Data
+    Add-Content -Path $script:mydocs\wv_usage_$script:date.csv  -Value '"Name","Total Size in MB","Free Size in MB","% Available"'
+               
+    $sresult.datastores.writable_volumes | Select-Object -Property @{Name = 'Name'; Expression = {$_.name}},@{Name = 'Total Size in MB'; Expression = {$_.total_mb}},@{Name = 'Free Size in MB'; Expression = {$_.free_mb}},@{Name = '% Available'; Expression = {$_.percent_available}} | Export-Csv -path $script:mydocs\wv_usage_$script:date.csv -NoTypeInformation
+    Write-host "Writing data to  $script:mydocs\wv_usage_$script:date.csv"   
+}  
 
 Function Activity_Log {
    
@@ -256,6 +308,8 @@ function Show-Menu
        Write-Host "Press '6' to list all Applications"
        Write-Host "Press '7' for the Activity Log"
        Write-Host "Press '8' for Online Entities"
+       Write-Host "Press '9' for Writable Volumes Usage"
+       Write-Host "Press '10' for Writable Volumes Usage Export to CSV" 
        Write-Host "Press 'Q' to quit."
          }
 
@@ -311,6 +365,19 @@ Activity_Log
 Get_Online
 
 }
+
+'9' {
+  
+  Writables_Usage
+  
+  }
+  
+'10' {
+    
+  Writables_Usage_Report
+  
+  } 
+  
 
     }
     pause
